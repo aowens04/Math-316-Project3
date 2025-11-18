@@ -1,0 +1,371 @@
+---
+title: "Marketing Data"
+author: "Paige Hill, Lauren McIntosh, Amaya Owens"
+format:
+  dashboard:
+    theme: flatly
+    orientation: rows
+    embed-resources: true
+jupyter:
+  kernelspec:
+    name: python3
+    display_name: Python 3
+    language: python
+---
+
+```{python}
+#| label: info
+#| include: false
+
+import pandas as pd
+import altair as alt
+import numpy as np
+from great_tables import GT
+import matplotlib.pyplot as plt
+alt.renderers.enable('html')
+
+#initializing dataframe
+df = pd.read_csv("bank-full.csv", sep=";")
+
+#sample dataframe
+df_sample = df.sample(5000, random_state=516)
+
+```
+# Demographics and Finances
+## Row {height="60px"}
+<div style="font-size: 15pt">What are the demographic and financial profiles of clients who subscribe to a term deposit compared to those who do not?</div>
+
+## Row
+
+### Column
+
+```{python}
+#| echo: false
+
+# Age groups analysis
+age_bins = [18, 30, 40, 50, 60, 100]
+age_labels = ['18-30', '31-40', '41-50', '51-60', '60+']
+df['age_group'] = pd.cut(df['age'], bins=age_bins, labels=age_labels)
+
+# Calculate subscription rates by age group and average balance
+age_profile = df.groupby('age_group', observed=False).agg({
+    'y': lambda x: (x == 'yes').sum() / len(x) * 100,
+    'balance': 'mean'
+}).reset_index()
+age_profile.columns = ['age_group', 'subscription_rate', 'avg_balance']
+
+# Create dual-axis chart for Age & Balance vs Subscription
+fig1, ax1 = plt.subplots(figsize=(8, 6))
+
+x_pos = range(len(age_profile))
+_ = ax1.bar(x_pos, age_profile['subscription_rate'], alpha=0.7, color='#3182bd', label='Subscription Rate (%)')
+_ = ax1.set_xlabel('Age Group', fontsize=12, fontweight='bold')
+_ = ax1.set_ylabel('Subscription Rate (%)', fontsize=12, fontweight='bold', color='#3182bd')
+_ = ax1.set_xticks(x_pos)
+_ = ax1.set_xticklabels(age_profile['age_group'])
+ax1.tick_params(axis='y', labelcolor='#3182bd')
+
+ax2 = ax1.twinx()
+_ = ax2.plot(x_pos, age_profile['avg_balance'], 'o-', color='#de2d26', linewidth=3, markersize=8, label='Avg Balance (€)')
+_ = ax2.set_ylabel('Average Account Balance (€)', fontsize=12, fontweight='bold', color='#de2d26')
+ax2.tick_params(axis='y', labelcolor='#de2d26')
+
+_ = plt.title('Age Group & Account Balance vs Subscription Rate', fontsize=14, fontweight='bold', pad=20)
+fig1.tight_layout()
+plt.show()
+plt.close()
+```
+
+```{python}
+#| echo: false
+
+# Education level analysis using group-by
+education_profile = df.groupby('education', observed=False).agg({
+    'y': [
+        ('total', 'count'),
+        ('subscribed', lambda x: (x == 'yes').sum()),
+        ('not_subscribed', lambda x: (x == 'no').sum()),
+        ('subscription_rate', lambda x: (x == 'yes').sum() / len(x) * 100)
+    ]
+}).reset_index()
+education_profile.columns = ['education', 'total', 'subscribed', 'not_subscribed', 'subscription_rate']
+
+# Sort by subscription rate
+education_profile = education_profile.sort_values('subscription_rate', ascending=True)
+
+# Create horizontal bar chart
+fig2, ax = plt.subplots(figsize=(8, 6))
+
+y_pos = range(len(education_profile))
+width = 0.35
+
+_ = ax.barh([y - width/2 for y in y_pos], education_profile['subscription_rate'], 
+                width, label='Subscription Rate (%)', color='#31a354', alpha=0.8)
+_ = ax.barh([y + width/2 for y in y_pos], 100 - education_profile['subscription_rate'], 
+                width, label='Non-Subscription Rate (%)', color='#de2d26', alpha=0.8)
+
+_ = ax.set_yticks(y_pos)
+_ = ax.set_yticklabels(education_profile['education'])
+_ = ax.set_xlabel('Percentage (%)', fontsize=12, fontweight='bold')
+_ = ax.set_ylabel('Education Level', fontsize=12, fontweight='bold')
+_ = ax.set_title('Subscription vs Non-Subscription Rates by Education Level', fontsize=14, fontweight='bold')
+_ = ax.legend()
+_ = ax.set_xlim(0, 100)
+
+# Add percentage labels
+for i, (sub, non_sub) in enumerate(zip(education_profile['subscription_rate'], 100 - education_profile['subscription_rate'])):
+    _ = ax.text(sub + 1, i - width/2, f'{sub:.1f}%', va='center', fontsize=9, fontweight='bold')
+    _ = ax.text(non_sub + 1, i + width/2, f'{non_sub:.1f}%', va='center', fontsize=9, fontweight='bold')
+
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+### Column
+
+<div style="padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
+<h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 10px;">Key Findings</h3>
+
+- **Age:** 51-60 age group shows highest subscription rates (14.6%)
+- **Education:** Tertiary education leads with 15.0% subscription rate
+- **Jobs:** Students (28.7%) and retirees (22.8%) have highest subscription rates
+- **Balance:** Average account balance peaks at €2,678 for ages 60+
+</div>
+
+```{python}
+#| echo: false
+
+# Job category analysis using group-by
+job_profile = df.groupby('job', observed=False).agg({
+    'y': [
+        ('total', 'count'),
+        ('subscribed', lambda x: (x == 'yes').sum()),
+        ('not_subscribed', lambda x: (x == 'no').sum()),
+        ('subscription_rate', lambda x: (x == 'yes').sum() / len(x) * 100)
+    ]
+}).reset_index()
+job_profile.columns = ['job', 'total', 'subscribed', 'not_subscribed', 'subscription_rate']
+
+# Sort by subscription rate
+job_profile = job_profile.sort_values('subscription_rate', ascending=False)
+
+# Create grouped bar chart
+fig3, ax = plt.subplots(figsize=(8, 6))
+
+x_pos = range(len(job_profile))
+width = 0.35
+
+_ = ax.bar([x - width/2 for x in x_pos], job_profile['subscription_rate'], 
+               width, label='Subscription Rate (%)', color='#756bb1', alpha=0.8)
+_ = ax.bar([x + width/2 for x in x_pos], 100 - job_profile['subscription_rate'], 
+               width, label='Non-Subscription Rate (%)', color='#fd8d3c', alpha=0.8)
+
+_ = ax.set_xticks(x_pos)
+_ = ax.set_xticklabels(job_profile['job'], rotation=45, ha='right')
+_ = ax.set_ylabel('Percentage (%)', fontsize=12, fontweight='bold')
+_ = ax.set_xlabel('Job Category', fontsize=12, fontweight='bold')
+_ = ax.set_title('Subscription vs Non-Subscription Rates by Job Category', fontsize=14, fontweight='bold')
+_ = ax.legend()
+_ = ax.set_ylim(0, 110)
+
+# Add percentage labels on top of bars
+for i, (sub, non_sub) in enumerate(zip(job_profile['subscription_rate'], 100 - job_profile['subscription_rate'])):
+    _ = ax.text(i - width/2, sub + 1, f'{sub:.1f}%', ha='center', va='bottom', fontsize=8, fontweight='bold')
+    _ = ax.text(i + width/2, non_sub + 1, f'{non_sub:.1f}%', ha='center', va='bottom', fontsize=8, fontweight='bold')
+
+plt.tight_layout()
+plt.show()
+plt.close()
+```
+
+
+
+# Strategy
+
+## Row {height="60px"}
+<div style="font-size: 15pt">How does the strategy of the campaign correlate with success rate of subscriptions?</div>
+
+## Row 
+```{python}
+day_bins = [0,7,14,21,30]
+day_labels=["1-7","8-14","15-21","22-30"]
+binned_days = pd.cut(df['day'], bins=day_bins, labels=day_labels)
+
+days_crosstab = pd.crosstab(binned_days, df['y'])
+days_crosstab['percent'] = days_crosstab['yes']/(days_crosstab['no']+days_crosstab['yes'])
+days_crosstab['days'] = days_crosstab.index
+reordered_days = days_crosstab[['days','yes','no','percent']]
+
+pretty_days = (GT(reordered_days)
+    .tab_header(title="Day of Contact")
+    .tab_options(table_width="75%")
+    .fmt_percent(columns='percent')
+    .fmt_number(columns = ['yes', 'no'], decimals=0)
+    .data_color(
+        palette="Blues",
+        domain=[0.11, 1],
+        na_color="white",
+        columns="percent"
+    )
+    .cols_align(align="center", columns=['days','yes','no','percent'])
+
+               )
+
+
+pretty_days
+```
+```{python}
+month_order = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+df['month'] = pd.Categorical(df['month'], categories=month_order, ordered=True)
+
+#what month someone is contacted and success of campaign
+
+month_crosstab = pd.crosstab(df["month"], df["y"])
+month_crosstab['percent'] = month_crosstab['yes']/(month_crosstab['yes'] + month_crosstab['no'])
+month_crosstab['month'] = month_order
+reordered_month = month_crosstab[['month', 'yes', 'no', 'percent']]
+
+pretty_month = (GT(reordered_month)
+    .tab_header(title="Month of Contact")
+    .tab_options(table_width="75%")
+    .fmt_percent(columns='percent')
+    .fmt_number(columns = ['yes', 'no'], decimals=0)
+    .data_color(
+        palette="Blues",
+        domain=[0.11, 1],
+        na_color="white"
+    )
+    .cols_align(align="center", columns=['month','yes','no','percent'])
+    .opt_vertical_padding(scale=0.70)
+)
+pretty_month
+```
+
+```{python}
+#| label : campaign
+#| include : false
+#put data into categories
+bins = [0,10,20,30,40,50,60,70]
+labels=["1-10","11-20","21-30","31-40","41-50","51-60","61-70"]
+binned_data = pd.cut(df['campaign'], bins=bins, labels=labels)
+
+#make crosstab table
+campaign_crosstab = pd.crosstab(binned_data, df["y"])
+campaign_crosstab['percent'] = campaign_crosstab['yes']/(campaign_crosstab['yes'] + campaign_crosstab['no'])
+campaign_crosstab.reset_index()
+campaign_crosstab['contacts']=campaign_crosstab.index
+reordered_campaign = campaign_crosstab[['contacts','yes','no','percent']]
+```
+```{python}
+#stylize table
+pretty_campaign = (GT(reordered_campaign)
+    .tab_header(title="Number of Contacts")
+    .tab_options(table_width = "75%")
+    .fmt_percent(columns='percent')
+    .fmt_number(columns = ['yes', 'no'], decimals=0)
+    .data_color(
+        palette="Blues",
+        domain=[0.11, 1],
+        na_color="white",
+        columns="percent"
+    )
+    .cols_align(align="center", columns=['campaign','yes','no','percent'])
+               )
+
+pretty_campaign
+```
+# Personal & Housing Loans
+
+## Row {height="60px"}
+<div style="font-size: 15pt"> To what extent does a client's current loans affect their likelihood of subscribing for the current campaign? </div>
+
+## Row
+```{python}
+loan_comparison = (
+alt.Chart(df_sample)
+.transform_fold(
+["housing", "loan"],
+as_=["Loan Type", "Status"]
+)
+.mark_bar()
+.encode(
+x=alt.X("Status:N", title="Has Loan?"),
+y=alt.Y("count():Q", title="Number of Clients"),
+color=alt.Color("y:N", title="Subscribed?"),
+column=alt.Column("Loan Type:N", title=None)
+)
+.properties(
+title="Subscription Status by Housing and Personal Loan Ownership",
+width=200,
+height=300
+)
+)
+
+loan_comparison
+```
+
+# Past Campaigns
+## Row {height="60px"}
+<div style="font-size: 15pt"> To what extent does a client's past interaction with the bank affect their likelihood of subscribing for the current campaign? </div>
+
+## Row
+
+```{python}
+
+#Click selection on previous outcome
+
+poutcome_click = alt.selection_point(fields=["poutcome"], value="success")
+
+#Previous outcome selector
+
+poutcome_selector = (
+alt.Chart(df_sample)
+.mark_bar()
+.encode(
+y=alt.Y("poutcome:N", sort="-x", title="Previous Campaign Outcome"),
+x=alt.X("count():Q", title="Number of Clients"),
+color=alt.when(poutcome_click)
+.then(alt.Color("poutcome:N"))
+.otherwise(alt.value("lightgray")),
+opacity=alt.when(poutcome_click)
+.then(alt.value(1))
+.otherwise(alt.value(0.4)),
+)
+.add_params(poutcome_click)
+.properties(width=250, height=300, title="Select Previous Outcome")
+)
+
+#Filtered charts
+
+pdays_filtered = (
+alt.Chart(df_sample)
+.mark_bar(size=8)
+.encode(
+x=alt.X("pdays:Q", bin=alt.Bin(maxbins=30), title="Days Since Last Contact"),
+y=alt.Y("count():Q", title="Number of Clients"),
+color=alt.Color("y:N", title="Subscribed?")
+)
+.transform_filter(poutcome_click)
+.properties(width=300, height=250, title="Days Since Last Contact (Filtered)")
+)
+
+previous_filtered = (
+alt.Chart(df_sample)
+.mark_bar(size=8)
+.encode(
+x=alt.X("previous:Q", bin=alt.Bin(maxbins=20), title="Number of Previous Contacts"),
+y=alt.Y("count():Q", title="Number of Clients"),
+color=alt.Color("y:N", title="Subscribed?")
+)
+.transform_filter(poutcome_click)
+.properties(width=300, height=250, title="Previous Contacts (Filtered)")
+)
+
+
+dashboard = poutcome_selector | pdays_filtered | previous_filtered
+dashboard.properties(
+    title="Interactive Exploration of Past Interactions and Subscription Outcomes"
+)
+
+```
