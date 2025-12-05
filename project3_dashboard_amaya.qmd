@@ -572,3 +572,102 @@ disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['yes', 'no'])
 disp.plot(cmap="Greens")
 
 ```
+# Metric Comparison
+##
+
+```{python}
+#|include: false
+# Add predictions to test data for analysis
+X_test_copy = X_test.copy()
+X_test_copy["y_threshold"] = y_pred_threshold
+X_test_copy["y_actual"] = y_test
+
+# Function to calculate metrics for a specific job
+def calculate_job_metrics(job_name):
+    job_filter = X_test_copy["job"] == job_name
+    y_actual_job = X_test_copy[job_filter]["y_actual"]
+    y_pred_job = X_test_copy[job_filter]["y_threshold"]
+    
+    f1 = f1_score(y_actual_job, y_pred_job, pos_label='yes', zero_division=0)
+    precision = precision_score(y_actual_job, y_pred_job, pos_label='yes', zero_division=0)
+    recall = recall_score(y_actual_job, y_pred_job, pos_label='yes', zero_division=0)
+    accuracy = accuracy_score(y_actual_job, y_pred_job)
+    sample_count = len(y_actual_job)
+    return {
+        'job': job_name,
+        'f1_score': f1,
+        'precision': precision,
+        'recall': recall,
+        'accuracy': accuracy,
+        'sample_count': sample_count
+    }
+
+# Calculate metrics for all jobs
+available_jobs = sorted(X_test_copy["job"].unique())
+job_metrics = []
+for job in available_jobs:
+    metrics = calculate_job_metrics(job)
+    job_metrics.append(metrics)
+
+metrics_df = pd.DataFrame(job_metrics)
+
+# Create job distribution chart (as requested - leave as is)
+job_selection = alt.selection_point(fields=['job'], value = " ")
+
+job_chart = alt.Chart(df).mark_bar(cursor='pointer').encode(
+    x=alt.X('job:N', sort='-x', title='Job Type'),
+    y=alt.Y('count():Q', title='Number of Clients'),
+    color=alt.condition(
+        job_selection,
+        alt.Color('job:N', scale=alt.Scale(scheme='set2'), legend=None),
+        alt.value('lightblue')
+    ),
+    opacity=alt.condition(job_selection, alt.value(1.0), alt.value(0.6)),
+    stroke=alt.condition(job_selection, alt.value('black'), alt.value('lightgray')),
+    strokeWidth=alt.condition(job_selection, alt.value(2), alt.value(1)),
+    tooltip=['job:N', 'count():Q'],
+).add_params(
+    job_selection
+).properties(
+    width=400,
+    height=300,
+    title='Job Distribution - Click to Select'
+)
+
+# Create performance metrics chart that updates with selection
+metrics_long = []
+for _, row in metrics_df.iterrows():
+    metrics_long.extend([
+        {'job': row['job'], 'metric': 'F1 Score', 'value': row['f1_score']},
+        {'job': row['job'], 'metric': 'Precision', 'value': row['precision']},
+        {'job': row['job'], 'metric': 'Recall', 'value': row['recall']},
+        {'job': row['job'], 'metric': 'Accuracy', 'value': row['accuracy']}
+    ])
+
+metrics_long_df = pd.DataFrame(metrics_long)
+
+metrics_chart = alt.Chart(metrics_long_df).mark_bar().encode(
+    x=alt.X('metric:N', title='Performance Metrics'),
+    y=alt.Y('value:Q', title='Score (0-1)', scale=alt.Scale(domain=[0, 1])),
+    color=alt.Color('metric:N', scale=alt.Scale(scheme='viridis')),
+    opacity=alt.condition(job_selection, alt.value(1.0), alt.value(0.1)),
+    tooltip=['metric:N', alt.Tooltip('value:Q', format='.3f')]
+).transform_filter(
+    job_selection
+).properties(
+    width=400,
+    height=200,
+    title='Performance Metrics for Selected Job'
+).add_params(job_selection)
+
+
+# Display
+alt.data_transformers.enable("vegafusion")
+
+```
+### Column
+
+```{python}
+dashboard = job_chart|metrics_chart
+dashboard
+```
