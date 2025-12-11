@@ -369,7 +369,7 @@ dashboard.properties(
 )
 ```
 
-# Classification Model
+# Classification Models
 ## Row
 ### Column
 ```{python}
@@ -386,7 +386,10 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 ```
 
-- Duration Only Classifier
+- **Baseline Classifier**
+- Uses only duration variable
+	- Not useful because you would have to contact the customer to know if they are willing to subscribe
+- This will serve as the baseline model and the goal is to get a better-performing model
 - Performance Metrics: 
 	- F1 Score: 0.26
 	- Precision: 0.54
@@ -433,7 +436,10 @@ disp.plot(cmap="Reds")
 ```
 
 ### Column
-- Gradient Boosting Classifier
+- **Gradient Boosting Classifier**
+- Uses hyperparameter tuning
+- Need to improve recall score
+	- recall is the number of customers that were predicted as not subscribing when they actually did
 - Performance Metrics: 
 	- F1 Score: 0.36
 	- Precision: 0.61
@@ -498,9 +504,10 @@ disp.plot(cmap="Blues")
 ```
 
 ### Column
-- Gradient Boosting Classifier
-- Using SMOTE oversampling
-- Threshold of 0.25
+- **Final Model**
+- Gradient Boosting Classifier with Smote oversampling and custom threshold of 0.25
+- Slighly lower accuracy, but with an improved recall score
+- Performance Metrics:
 	- F1 Score: 0.47
 	- Precision: 0.48
 	- Recall: 0.46
@@ -573,6 +580,9 @@ disp.plot(cmap="Greens")
 
 ```
 # Metric Comparison
+##
+Interactive chart to explore the difference in metrics between each job with the final model
+
 ##
 
 ```{python}
